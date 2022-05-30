@@ -13,5 +13,10 @@ public:
 	void UncheckedSetKey(const byte* userKey, unsigned int keyLength);
 
 private:
+
+	void GetUserKey(void* dest, const byte* userKey, int keyLength);
+
 	word32 m_rkeys[SM4_NUM_ROUNDS];
+
+	word32 m_wspace[5];
 };
