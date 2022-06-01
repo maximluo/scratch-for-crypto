@@ -52,7 +52,7 @@ SM4::~SM4()
 
 void SM4::UncheckedSetKey(const byte* userKey, unsigned int keyLength)
 {
-    GetUserKey(m_wspace, userKey, keyLength);
+    GetUserKey(userKey, keyLength);
 
     // Get value of K0, K1, K2 and K3
     m_wspace[0] ^= FK[0];
@@ -70,9 +70,17 @@ void SM4::UncheckedSetKey(const byte* userKey, unsigned int keyLength)
     }
 }
 
-void SM4::GetUserKey(void *dest, const byte* userKey, int keyLength)
+// Key is a 128 bit data with big endian
+void SM4::GetUserKey(const byte* userKey, int keyLength)
 {
-    std::memcpy(dest, userKey, keyLength);
+    // TODO: need to check keyLength
+    (void)keyLength;
+
+    // Brute force to convert big endian data to little endian data
+    m_wspace[0] = GETWORd32(userKey);
+    m_wspace[1] = GETWORd32(userKey + 4);
+    m_wspace[2] = GETWORd32(userKey + 8);
+    m_wspace[3] = GETWORd32(userKey + 12);
 }
 
 // The transform T'(x) for round keys
