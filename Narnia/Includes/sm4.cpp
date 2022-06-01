@@ -40,9 +40,8 @@ const word32 FK[4] =
 
 SM4::SM4()
 {
-    std::memset(m_rkeys, 0, SM4_NUM_ROUNDS);
-
-    std::memset(m_wspace, 0, sizeof(m_wspace));
+    std::memset(m_rKeys, 0, SM4_NUM_ROUNDS);
+    std::memset(m_wSpace, 0, sizeof(m_wSpace));
 }
 
 SM4::~SM4()
@@ -50,37 +49,40 @@ SM4::~SM4()
 
 }
 
-void SM4::UncheckedSetKey(const byte* userKey, unsigned int keyLength)
-{
-    GetUserKey(userKey, keyLength);
-
-    // Get value of K0, K1, K2 and K3
-    m_wspace[0] ^= FK[0];
-    m_wspace[1] ^= FK[1];
-    m_wspace[2] ^= FK[3];
-    m_wspace[3] ^= FK[3];
-
-    // Get round keys
-    for (int i = 0; i < SM4_NUM_ROUNDS;)
-    {
-        m_rkeys[i] = (m_wspace[0] ^= SM4_G(m_wspace[1] ^ m_wspace[2] ^ m_wspace[3] ^ CK[i])); i++;
-        m_rkeys[i] = (m_wspace[1] ^= SM4_G(m_wspace[2] ^ m_wspace[3] ^ m_wspace[0] ^ CK[i])); i++;
-        m_rkeys[i] = (m_wspace[2] ^= SM4_G(m_wspace[3] ^ m_wspace[0] ^ m_wspace[1] ^ CK[i])); i++;
-        m_rkeys[i] = (m_wspace[3] ^= SM4_G(m_wspace[0] ^ m_wspace[1] ^ m_wspace[2] ^ CK[i])); i++;
-    }
-}
-
-// Key is a 128 bit data with big endian
-void SM4::GetUserKey(const byte* userKey, int keyLength)
+void SM4::UncheckedSetKey(const byte *userKey, unsigned int keyLength)
 {
     // TODO: need to check keyLength
     (void)keyLength;
 
-    // Brute force to convert big endian data to little endian data
-    m_wspace[0] = GETWORd32(userKey);
-    m_wspace[1] = GETWORd32(userKey + 4);
-    m_wspace[2] = GETWORd32(userKey + 8);
-    m_wspace[3] = GETWORd32(userKey + 12);
+    ConvertBigEndianToLittleEndian(userKey, keyLength);
+
+    // Get value of K0, K1, K2 and K3
+    m_wSpace[0] ^= FK[0];
+    m_wSpace[1] ^= FK[1];
+    m_wSpace[2] ^= FK[2];
+    m_wSpace[3] ^= FK[3];
+
+    // Get round keys
+    for (int i = 0; i < SM4_NUM_ROUNDS;)
+    {
+        m_rKeys[i] = (m_wSpace[0] ^= SM4_G(m_wSpace[1] ^ m_wSpace[2] ^ m_wSpace[3] ^ CK[i])); i++;
+        m_rKeys[i] = (m_wSpace[1] ^= SM4_G(m_wSpace[2] ^ m_wSpace[3] ^ m_wSpace[0] ^ CK[i])); i++;
+        m_rKeys[i] = (m_wSpace[2] ^= SM4_G(m_wSpace[3] ^ m_wSpace[0] ^ m_wSpace[1] ^ CK[i])); i++;
+        m_rKeys[i] = (m_wSpace[3] ^= SM4_G(m_wSpace[0] ^ m_wSpace[1] ^ m_wSpace[2] ^ CK[i])); i++;
+    }
+}
+
+void SM4::ConvertBigEndianToLittleEndian(const byte* data, unsigned int size)
+{
+    (void)size;
+
+    std::memset(m_wSpace, 0, sizeof(m_wSpace));
+
+    // Brute force to convert
+    m_wSpace[0] = GETWORd32(data);
+    m_wSpace[1] = GETWORd32(data + 4);
+    m_wSpace[2] = GETWORd32(data + 8);
+    m_wSpace[3] = GETWORd32(data + 12);
 }
 
 // The transform T'(x) for round keys
@@ -92,8 +94,58 @@ word32 SM4::SM4_G(word32 x)
     return t ^ ROL32(t,13) ^ ROL32(t,23);
 }
 
-// The un-linear transform B(x) with S box
+// The nonlinear transform B(x) with S box
 word32 SM4::SM4_H(word32 x)
 {
     return (S[GETBYTE(x, 3)] << 24) | (S[GETBYTE(x, 2)] << 16) | (S[GETBYTE(x, 1)] << 8) | (S[GETBYTE(x, 0)]);
+}
+
+// The transform T(x) for encrypt/decrypt
+word32 SM4::SM4_F(word32 x)
+{
+    const word32 t = SM4_H(x);
+
+    // The linear transform L for encrypt/decrypt
+    return t ^ ROL32(t, 2) ^ ROL32(t, 10) ^ ROL32(t, 18) ^ ROL32(t, 24);
+}
+
+void SM4::SM4_Round(word32 *wSpace, const word32 *rKeys, unsigned int round, bool bEncrypt)
+{
+    if (!bEncrypt)
+    {
+        wSpace[0] ^= SM4_F(wSpace[1] ^ wSpace[2] ^ wSpace[3] ^ rKeys[round - 0]);
+        wSpace[1] ^= SM4_F(wSpace[0] ^ wSpace[2] ^ wSpace[3] ^ rKeys[round - 1]);
+        wSpace[2] ^= SM4_F(wSpace[0] ^ wSpace[1] ^ wSpace[3] ^ rKeys[round - 2]);
+        wSpace[3] ^= SM4_F(wSpace[0] ^ wSpace[1] ^ wSpace[2] ^ rKeys[round - 3]);
+    }
+    else
+    {
+        wSpace[0] ^= SM4_F(wSpace[1] ^ wSpace[2] ^ wSpace[3] ^ rKeys[round + 0]);
+        wSpace[1] ^= SM4_F(wSpace[0] ^ wSpace[2] ^ wSpace[3] ^ rKeys[round + 1]);
+        wSpace[2] ^= SM4_F(wSpace[0] ^ wSpace[1] ^ wSpace[3] ^ rKeys[round + 2]);
+        wSpace[3] ^= SM4_F(wSpace[0] ^ wSpace[1] ^ wSpace[2] ^ rKeys[round + 3]);
+    }
+}
+
+void SM4::Encrypt(const byte *inBlock, unsigned int blockSize)
+{
+    // TODO: need to check block size
+    (void)blockSize;
+
+    ConvertBigEndianToLittleEndian(inBlock, blockSize);
+
+    // Encrypt the message, the length of stride is 4
+    SM4_Round(m_wSpace, m_rKeys, 0, true);
+    SM4_Round(m_wSpace, m_rKeys, 4, true);
+    SM4_Round(m_wSpace, m_rKeys, 8, true);
+    SM4_Round(m_wSpace, m_rKeys, 12, true);
+    SM4_Round(m_wSpace, m_rKeys, 16, true);
+    SM4_Round(m_wSpace, m_rKeys, 20, true);
+    SM4_Round(m_wSpace, m_rKeys, 24, true);
+    SM4_Round(m_wSpace, m_rKeys, 28, true);
+}
+
+void SM4::Decrypt()
+{
+    
 }
