@@ -141,7 +141,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\Includes\sm4.cpp" />
+    <ClCompile Include="..\Sources\sm4.cpp" />
     <ClCompile Include="..\Sources\Source.cpp" />
   </ItemGroup>
   <ItemGroup>
