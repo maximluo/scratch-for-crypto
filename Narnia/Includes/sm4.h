@@ -18,7 +18,7 @@ public:
      * @param userKey A 128 bit cipher or de-cipher key with big endian
      * @param keyLength Key's length in bytes
      */
-    void UncheckedSetKey(const byte* userKey, unsigned int keyLength);
+    void UncheckedSetKey(const byte* mainKey, unsigned int keyLength);
 
     /**
      * Encrypt data

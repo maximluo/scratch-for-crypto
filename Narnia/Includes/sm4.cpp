@@ -50,12 +50,12 @@ SM4::~SM4()
 
 }
 
-void SM4::UncheckedSetKey(const byte* userKey, unsigned int keyLength)
+void SM4::UncheckedSetKey(const byte* mainKey, unsigned int keyLength)
 {
     // TODO: need to check keyLength
     (void)keyLength;
 
-    ConvertBigEndianToLittleEndian(userKey, keyLength);
+    ConvertBigEndianToLittleEndian(mainKey, keyLength);
 
     // Get value of K0, K1, K2 and K3
     m_wSpace[0] ^= FK[0];
